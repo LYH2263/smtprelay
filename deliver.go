@@ -93,12 +93,22 @@ func (r *Relay) DialAndSend(ctx context.Context, dialer smtpdial.Dialer, host st
 	if dialer == nil {
 		return DeliveryResult{}, ErrNoDialer
 	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
 
-	_ = ctx
-	time.Sleep(50 * time.Millisecond)
+	// Handshake wait — honor ctx so a cancelled caller returns promptly
+	// instead of blocking for the full duration.
+	timer := time.NewTimer(50 * time.Millisecond)
+	select {
+	case <-timer.C:
+	case <-ctx.Done():
+		timer.Stop()
+		return DeliveryResult{TargetHost: host}, ctx.Err()
+	}
 
 	to := env.RecipientAddresses()
-	code, resp, err := dialer.Send(context.Background(), smtpdial.Request{
+	code, resp, err := dialer.Send(ctx, smtpdial.Request{
 		Host:     host,
 		Port:     port,
 		MailFrom: env.MailFrom,

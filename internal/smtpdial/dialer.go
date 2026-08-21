@@ -34,9 +34,15 @@ type MemoryDialer struct {
 }
 
 func (m *MemoryDialer) Send(ctx context.Context, req Request) (int, string, error) {
-
 	if m.Delay > 0 {
-		time.Sleep(m.Delay)
+		// Honor ctx so a cancelled caller does not wait out the full Delay.
+		timer := time.NewTimer(m.Delay)
+		select {
+		case <-timer.C:
+		case <-ctx.Done():
+			timer.Stop()
+			return 0, "", ctx.Err()
+		}
 	}
 	m.Last = req
 	cp := req
@@ -75,6 +81,18 @@ func (d NetDialer) Send(ctx context.Context, req Request) (int, string, error) {
 	}
 	defer conn.Close()
 	_ = conn.SetDeadline(time.Now().Add(timeout))
+
+	// Honor ctx during the SMTP exchange: closing the conn cancels any
+	// in-flight read/write so Send returns promptly on cancellation.
+	stop := make(chan struct{})
+	defer close(stop)
+	go func() {
+		select {
+		case <-ctx.Done():
+			_ = conn.Close()
+		case <-stop:
+		}
+	}()
 
 	sess := &session{conn: conn}
 	if code, msg, err := sess.read(); err != nil {
