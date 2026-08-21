@@ -51,10 +51,14 @@ func (r *Relay) SubmitContext(ctx context.Context, env *Envelope) (string, error
 	stored.State = StatePending
 	stored.NextAttempt = r.now()
 
-	if stored.Headers != nil {
-		if _, ok := stored.Headers["Message-Id"]; !ok {
-			stored.Headers["Message-Id"] = fmt.Sprintf("<%s@local.relay>", id)
-		}
+	// Headers must be a usable map before the envelope is stored: delivery
+	// stamps X-Relay-Attempt / DKIM-Signature directly into it, and a nil map
+	// would panic there. Initialize on enqueue rather than guarding each stamp.
+	if stored.Headers == nil {
+		stored.Headers = make(map[string]string)
+	}
+	if _, ok := stored.Headers["Message-Id"]; !ok {
+		stored.Headers["Message-Id"] = fmt.Sprintf("<%s@local.relay>", id)
 	}
 
 	r.byID[id] = stored

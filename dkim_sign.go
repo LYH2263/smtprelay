@@ -38,6 +38,12 @@ func (r *Relay) SignDKIM(env *Envelope) error {
 	headers["DKIM-Signature"] = sig
 	env.RawBody = intmime.Serialize(headers, body)
 
+	// env.Headers is the envelope-level cache; Submit initializes it, but a
+	// message restored from an older snapshot may carry nil. Allocate here so
+	// this stamp never panics regardless of how the envelope arrived.
+	if env.Headers == nil {
+		env.Headers = map[string]string{}
+	}
 	env.Headers["DKIM-Signature"] = sig
 	env.DKIMSigned = true
 	return nil

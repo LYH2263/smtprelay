@@ -10,7 +10,7 @@ import (
 )
 
 // DeliverOnce peeks one message, signs, dials, and Ack/Nack accordingly.
-func (r *Relay) DeliverOnce(ctx context.Context) (DeliveryResult, error) {
+func (r *Relay) DeliverOnce(ctx context.Context) (res DeliveryResult, err error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -27,11 +27,28 @@ func (r *Relay) DeliverOnce(ctx context.Context) (DeliveryResult, error) {
 	dialer := r.opts.Dialer
 	r.mu.Unlock()
 
+	// Anything past this point can panic (nil-map stamp, malformed body, DKIM
+	// math). Restore the message to pending so a panic never strands it in
+	// inflight — where Peek skips it and neither Ack nor Nack can reach it.
+	defer func() {
+		if rec := recover(); rec != nil {
+			_ = r.restorePending(env.ID)
+			err = fmt.Errorf("smtprelay: delivery panic: %v", rec)
+			res = DeliveryResult{MessageID: env.ID, AttemptedAt: r.now()}
+		}
+	}()
+
 	if dialer == nil {
 		_ = r.restorePending(env.ID)
 		return DeliveryResult{MessageID: env.ID, AttemptedAt: r.now()}, ErrNoDialer
 	}
 
+	// Guard against a nil Headers map slipping past Submit (e.g. a restored
+	// snapshot or an older queue file). Stamp writes below would panic on a
+	// nil map, leaving the message stranded in inflight with no Ack path.
+	if env.Headers == nil {
+		env.Headers = map[string]string{}
+	}
 	env.Headers["X-Relay-Attempt"] = "1"
 
 	if err := EnsureMIME(env); err != nil {
@@ -53,7 +70,7 @@ func (r *Relay) DeliverOnce(ctx context.Context) (DeliveryResult, error) {
 		return res, err
 	}
 
-	res, err := r.DialAndSend(ctx, dialer, host, port, env)
+	res, err = r.DialAndSend(ctx, dialer, host, port, env)
 	res.MessageID = env.ID
 	res.AttemptedAt = r.now()
 	res.TargetHost = host
