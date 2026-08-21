@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>go-smtprelay · maild</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <h1>SMTP Relay</h1>
+    <p>队列 · 试提交 · Bounce</p>
+  </header>
+  <main>
+    <section>
+      <h2>统计</h2>
+      <pre id="stats">loading…</pre>
+      <button id="refresh">刷新</button>
+      <button id="deliver">投递一次</button>
+    </section>
+    <section>
+      <h2>试提交</h2>
+      <label>From <input id="from" value="sender@example.com" /></label>
+      <label>To <input id="to" value="rcpt@example.com" /></label>
+      <label>Subject <input id="subject" value="hello relay" /></label>
+      <label>Body <textarea id="body">hi from maild</textarea></label>
+      <button id="submit">提交</button>
+    </section>
+    <section>
+      <h2>队列</h2>
+      <pre id="queue"></pre>
+    </section>
+    <section>
+      <h2>最近 Bounce</h2>
+      <pre id="bounces"></pre>
+    </section>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>
