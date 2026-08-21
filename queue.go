@@ -25,7 +25,9 @@ func (r *Relay) SubmitContext(ctx context.Context, env *Envelope) (string, error
 		return "", err
 	}
 
-	stored := env
+	// Clone so the caller's *Envelope and its slices cannot mutate what the
+	// queue stores; without this the caller can still alias RawBody/Headers.
+	stored := env.Clone()
 
 	r.mu.Lock()
 	defer r.mu.Unlock()
