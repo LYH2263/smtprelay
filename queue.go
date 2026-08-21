@@ -30,6 +30,9 @@ func (r *Relay) SubmitContext(ctx context.Context, env *Envelope) (string, error
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
+	if r.closed {
+		return "", ErrClosed
+	}
 	if len(r.byID) >= r.opts.MaxQueue {
 		return "", ErrQueueFull
 	}
