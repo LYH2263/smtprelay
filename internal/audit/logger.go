@@ -85,12 +85,23 @@ func (l *FileLogger) rotateLocked() error {
 		return nil
 	}
 
-	stamped := filepath.Join(l.dir, fmt.Sprintf("delivery-%d.log", time.Now().UnixNano()))
-	if err := os.Rename(l.path, stamped); err != nil {
+	// Close before Rename: on Windows a still-open file handle blocks
+	// os.Rename, leaving delivery.log locked. Closing first releases the
+	// handle so the rename succeeds, then we reopen a fresh file.
+	if err := l.f.Close(); err != nil {
+		l.f = nil
 		return err
 	}
-	_ = l.f.Close()
 	l.f = nil
+
+	stamped := filepath.Join(l.dir, fmt.Sprintf("delivery-%d.log", time.Now().UnixNano()))
+	if err := os.Rename(l.path, stamped); err != nil {
+		// Rename failed; reopen the original path so logging can continue.
+		if f, oerr := os.OpenFile(l.path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644); oerr == nil {
+			l.f = f
+		}
+		return err
+	}
 	f, err := os.OpenFile(l.path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
 	if err != nil {
 		return err

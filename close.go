@@ -17,8 +17,9 @@ func (r *Relay) Close() error {
 	flushErr := r.persistLocked(context.Background())
 	var auditErr error
 	if r.auditor != nil {
-
-		_ = r.auditor.Rotate()
+		// Close only: do not Rotate at shutdown. Rotating here would rename
+		// delivery.log and reopen it, racing with Close and (on Windows)
+		// leaving the file handle-bound. Close flushes and releases cleanly.
 		auditErr = r.auditor.Close()
 	}
 	r.closed = true
