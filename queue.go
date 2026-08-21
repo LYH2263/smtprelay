@@ -8,6 +8,15 @@ import (
 	"github.com/LYH2263/go-smtprelay/internal/persist"
 )
 
+// persister decouples the queue snapshot backend so tests can inject a
+// failing store without depending on filesystem permissions. *persist.Store
+// satisfies it in production.
+type persister interface {
+	Load() (persist.Snapshot, error)
+	Save(ctx context.Context, snap persist.Snapshot) error
+	Close() error
+}
+
 // Submit enqueues an envelope (clones body/headers/recipients).
 func (r *Relay) Submit(env *Envelope) (string, error) {
 	return r.SubmitContext(context.Background(), env)
@@ -94,6 +103,9 @@ func (r *Relay) Peek() (*Envelope, error) {
 }
 
 // Ack marks a message as sent and removes it from the active queue.
+// The snapshot is persisted before the message leaves memory: if persist
+// fails the message is restored to the queue (at-least-once) instead of a
+// half-success where memory has dropped it but disk never recorded the ack.
 func (r *Relay) Ack(id string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -111,10 +123,17 @@ func (r *Relay) Ack(id string) error {
 
 	delete(r.byID, id)
 	r.removeOrderLocked(id)
-	r.metrics.IncAcked()
 	if err := r.persistLocked(context.Background()); err != nil {
+		// Persist failed: put the message back so it stays queued for a later
+		// retry/re-ack rather than being lost to a half-success. Restoring to
+		// pending makes Peek pick it up again (a possible duplicate delivery
+		// is preferred over silently dropping delivered-but-undurable mail).
+		env.State = StatePending
+		r.byID[id] = env
+		r.order = append(r.order, id)
 		return err
 	}
+	r.metrics.IncAcked()
 	return nil
 }
 

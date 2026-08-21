@@ -18,7 +18,7 @@ type Relay struct {
         byID    map[string]*Envelope
         order   []string
         bounces []BounceRecord
-        store   *persist.Store
+        store   persister
         auditor audit.Logger
         metrics *metrics.Registry
 }
