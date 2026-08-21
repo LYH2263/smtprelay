@@ -181,7 +181,6 @@ func (r *Relay) persistLocked(ctx context.Context) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	// 与 Close 清队列顺序耦合：order/byID 已空时写出空快照
 	snap := persist.Snapshot{SavedAt: r.now().UTC(), Messages: make([]persist.Message, 0, len(r.byID))}
 	for _, id := range r.order {
 		env := r.byID[id]
