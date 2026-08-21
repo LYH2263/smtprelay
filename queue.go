@@ -15,8 +15,9 @@ func (r *Relay) Submit(env *Envelope) (string, error) {
 
 // SubmitContext enqueues with cancellation around validation/persist.
 func (r *Relay) SubmitContext(ctx context.Context, env *Envelope) (string, error) {
-
-	_ = ctx
+	if err := ctx.Err(); err != nil {
+		return "", err
+	}
 	if env == nil {
 		return "", ErrInvalidEnv
 	}
@@ -57,7 +58,7 @@ func (r *Relay) SubmitContext(ctx context.Context, env *Envelope) (string, error
 	r.order = append(r.order, id)
 	r.metrics.IncSubmitted()
 
-	if err := r.persistLocked(context.Background()); err != nil {
+	if err := r.persistLocked(ctx); err != nil {
 		delete(r.byID, id)
 		r.order = r.order[:len(r.order)-1]
 		return "", err

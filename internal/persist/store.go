@@ -86,8 +86,9 @@ func (s *Store) Load() (Snapshot, error) {
 
 // Save writes atomically via temp + rename.
 func (s *Store) Save(ctx context.Context, snap Snapshot) error {
-
-	_ = ctx
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	data, err := json.MarshalIndent(snap, "", "  ")
