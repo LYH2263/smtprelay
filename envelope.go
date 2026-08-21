@@ -55,8 +55,12 @@ func (e *Envelope) Clone() *Envelope {
 }
 
 func cloneRecipients(in []Recipient) []Recipient {
-
-	return in
+	if in == nil {
+		return nil
+	}
+	out := make([]Recipient, len(in))
+	copy(out, in)
+	return out
 }
 
 func cloneMimeParts(in []MimePart) []MimePart {

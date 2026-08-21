@@ -14,9 +14,7 @@ func (r *Relay) ListPending() []*Envelope {
 			continue
 		}
 
-		c := env.Clone()
-		c.Recipients = env.Recipients
-		out = append(out, c)
+		out = append(out, env.Clone())
 	}
 	return out
 }
